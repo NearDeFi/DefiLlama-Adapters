@@ -31,7 +31,12 @@ const coingeckoIds = {
     'MNGO': 'mango-markets',
     'RAY': 'raydium',
     'COPE': 'cope',
-    'STEP': 'step-finance'
+    'FTT': 'ftx-token',
+    'MSOL': 'msol',
+    'BNB': 'binance-coin',
+    'AVAX': 'avalanche',
+    'LUNA': 'terra-luna',
+    'GMT': 'stepn',
 }
 
 
@@ -49,15 +54,9 @@ async function tvl(timestamp) {
     return balances
 }
 
-async function test() {
-    console.log(await tvl(Date.now()/1000));
-}
-// test();
-
 module.exports = {
     timetravel: false,
     solana: {
         tvl,
     },
-    tvl
 }

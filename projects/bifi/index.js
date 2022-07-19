@@ -1,10 +1,9 @@
 const sdk = require("@defillama/sdk");
-const { staking } = require("../helper/staking");
-const Caver = require('caver-js');
+const { stakings } = require("../helper/staking");
 const OracleAbi = require('./abi/oracle.json');
-const TokenAbi = require('./abi/token.json');
+const { toUSDTBalances } = require("../helper/balances");
 
-const stakingPool = '0x488933457E89656D7eF7E69C10F2f80C7acA19b5';
+const stakingPool = ['0x488933457E89656D7eF7E69C10F2f80C7acA19b5', '0x4b1791422dE4807B2999Eeb65359F3E13fa9d11d'];
 const bfcAddr = '0x0c7D5ae016f806603CB1782bEa29AC69471CAb9c';
 
 const ethPool = '0x13000c4a215efe7e414bb329b2f11c39bcf92d78';
@@ -73,7 +72,15 @@ const avaxTokenPools = {
     'usdc': {
         'pool': '0x8385Ea36dD4BDC84B3F2ac718C332E18C1E42d36',
         'token': '0xA7D7079b0FEaD91F3e65f86E8915Cb59c1a4C664'
-    }
+    },
+    'dai': {
+        'pool': '0x34DA42143b0c6E321CEb76931c637c12Bd865f7e',
+        'token': '0xd586E7F844cEa2F87f50152665BCbc2C279D8d70'
+    },
+    'wbtc': {
+        'pool': '0xc4D1e935F02A44D44985E6b1C0eE1ee616fC146a',
+        'token': '0x50b7545627a5162F82A992c33b87aDc75187B218'
+    },
 }
 
 const klayOracleContract = '0xCD4F7C7451FFD8628b7F3D5c1b68a3A207ab1125';
@@ -82,10 +89,6 @@ const klaytnTokenPools = {
     'keth': {
         'pool': '0x07970F9D979D8594B394fE12345211C376aDfF89',
         'token': '0x34d21b1e550d73cee41151c77f3c73359527a396'
-    },
-    'kusdt': {
-        'pool': '0xe0e67b991d6b5CF73d8A17A10c3DE74616C1ec11',
-        'token': '0xcee8faf64bb97a73bb51e115aa89c17ffa8dd167'
     },
     'kusdt': {
         'pool': '0xe0e67b991d6b5CF73d8A17A10c3DE74616C1ec11',
@@ -213,15 +216,20 @@ async function avax(timestamp, block, chainBlocks) {
     return balances
 }
 
-async function klaytn() {
-    const provider = new Caver.providers.HttpProvider("https://cypress.chain.thebifrost.io/");
-    const caver = new Caver(provider);
+async function klaytn(ts, _block, chainBlocks) {
+    const chain = 'klaytn'
+    const block = chainBlocks[chain]
     let klaytnTVL = 0;
 
-    const oracleContract = new caver.klay.Contract(OracleAbi, klayOracleContract);
-
-    const klayPrice = await oracleContract.methods.getTokenPrice(0).call();
-    const klayBalance = await caver.rpc.klay.getBalance(klayPool);
+    const { output: klayPrice} = await sdk.api.abi.call({
+        chain, block,
+        target: klayOracleContract,
+        params: [0],
+        abi: OracleAbi.find(i => i.name === 'getTokenPrice')
+    })
+    const { output: klayBalance } = await sdk.api.eth.getBalance({
+        target: klayPool, block, chain
+    })
 
     klaytnTVL += klayPrice * klayBalance / (10 ** 36);
 
@@ -232,25 +240,38 @@ async function klaytn() {
         const tokenAddress = klaytnTokenPools[token].token;
         const tokenPoolAddress = klaytnTokenPools[token].pool;
 
-        const tokenPrice = await oracleContract.methods.getTokenPrice(oracleID).call();
+        const { output: tokenPrice} = await sdk.api.abi.call({
+            chain, block,
+            target: klayOracleContract,
+            params: [oracleID],
+            abi: OracleAbi.find(i => i.name === 'getTokenPrice')
+        })
 
-        const tokenContract = new caver.klay.Contract(TokenAbi, tokenAddress);
-        const balance = await tokenContract.methods.balanceOf(tokenPoolAddress).call();
-        const decimals = await tokenContract.methods.decimals().call();
+        const { output: balance} = await sdk.api.abi.call({
+            chain, block,
+            target: tokenAddress,
+            params: [tokenPoolAddress],
+            abi: 'erc20:balanceOf'
+        })
+
+        const { output: decimals} = await sdk.api.abi.call({
+            chain, block,
+            target: tokenAddress,
+            abi: 'erc20:decimals'
+        })
 
         const div = 18 + parseInt(decimals, 10);
 
         klaytnTVL += balance * tokenPrice / 10 ** div;
     }
 
-    console.log(klaytnTVL);
-    return klaytnTVL;
+    return toUSDTBalances(klaytnTVL);
 }
 
 module.exports = {
     ethereum: {
         tvl: eth,
-        staking: staking(stakingPool, bfcAddr)
+        staking: stakings(stakingPool, bfcAddr)
     },
     bsc: {
         tvl: bsc

@@ -19,4 +19,7 @@ module.exports=fetchChainExports(chainTvl, [
   'fantom',    'moonriver',
   'okexchain', 'celo',
   'cronos',    'boba',
+  'harmony','xdai',
+  'velas','aurora',
+  'oasis'
 ])

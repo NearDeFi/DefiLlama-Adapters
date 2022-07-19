@@ -1,14 +1,10 @@
 const utils = require("../helper/utils");
-const { Connection, PublicKey } = require("@solana/web3.js");
+const { PublicKey } = require("@solana/web3.js");
 const { Coder } = require("@project-serum/anchor");
 const QuarryMineIDL = require("./quarry_mine.json");
 const { getMSolLPTokens, MSOL_LP_MINT } = require("./msolLP");
 
-const { getMultipleAccountBuffers } = require("../helper/solana");
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+const { getMultipleAccountBuffers, getConnection } = require("../helper/solana");
 
 const readTVL = async ({
   tokenA,
@@ -57,17 +53,18 @@ async function tvl() {
   const {
     data: { quarriesByStakedMint, coingeckoIDs },
   } = await utils.fetchURL(
-    "https://raw.githubusercontent.com/QuarryProtocol/rewarder-list/master/data/mainnet-beta/tvl.json"
+    "https://raw.githubusercontent.com/QuarryProtocol/rewarder-list-build/master/mainnet-beta/tvl.json"
   );
   const { data: saberPools } = await utils.fetchURL(
     "https://registry.saber.so/data/llama.mainnet.json"
   );
 
-  const connection = new Connection("https://api.mainnet-beta.solana.com");
+  const connection = getConnection();
   const coder = new Coder(QuarryMineIDL);
+  let i = 0
+  utils.log('total', Object.keys(quarriesByStakedMint).length)
 
   for (const [stakedMint, quarryKeys] of Object.entries(quarriesByStakedMint)) {
-    console.log(`Fetching ${stakedMint}`);
     const coingeckoID = coingeckoIDs[stakedMint];
     const saberPool = coingeckoID
       ? null
@@ -127,15 +124,17 @@ async function tvl() {
     }
 
     // sleep to avoid rate limiting issues
-    await sleep(1200);
+    utils.log('done', ++i)
+    await utils.sleep(1200);
   }
 
   return tvlResult;
 }
 
 module.exports = {
+  doublecounted: true,
   timetravel: false,
   methodology:
     "TVL counts deposits made to Quarry Protocol. CoinGecko is used to find the price of tokens in USD.",
-  tvl,
+  solana: { tvl },
 };
